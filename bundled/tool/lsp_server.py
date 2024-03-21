@@ -92,8 +92,14 @@ def did_change(ls: server.LanguageServer, params: lsp.DidChangeTextDocumentParam
         params (lsp.DidChangeTextDocumentParams): The parameters for the text document change.
     """
     try:
-        diagnostics = validate(ls, params, True, False)
+        diagnostics = validate(ls, params, True, True)
         ls.publish_diagnostics(params.text_document.uri, diagnostics)
+        if not any(
+            diagnostic.severity == lsp.DiagnosticSeverity.Error
+            for diagnostic in diagnostics
+        ):
+            update_doc_tree(ls, params.text_document.uri)
+            update_doc_deps(ls, params.text_document.uri)
     except Exception as e:
         log_error(ls, f"Error during document change: {e}")
 

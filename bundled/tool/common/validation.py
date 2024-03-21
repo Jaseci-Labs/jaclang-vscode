@@ -51,15 +51,19 @@ def _validate_jac(
     diagnostics = []
     if use_source:
         errors, warnings = jac_to_errors(doc_path, source)
+        if rebuild and len(errors) == 0:
+            ls.jlws.rebuild_file(doc_path, False, source)
+            errors, warnings = ls.jlws.modules[doc_path].errors, ls.jlws.modules[doc_path].warnings
     else:
         if rebuild:
             ls.jlws.rebuild_file(doc_path)
-        errors, warnings = (
-            ls.jlws.modules[doc_path].errors,
-            ls.jlws.modules[doc_path].warnings,
-        )
-        warnings = warnings if ls.settings.get("showWarning", False) else []
-        print(errors, warnings)
+        errors, warnings = ls.jlws.modules[doc_path].errors, ls.jlws.modules[doc_path].warnings
+
+    if not ls.settings.get("showWarning", False):
+        warnings = []
+
+    print(errors, warnings)
+
     for alert in errors + warnings:
         msg = alert.msg
         loc = alert.loc

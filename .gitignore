@@ -13,3 +13,5 @@ bundled/libs/
 **/.vs
 
 dev_requirements.txt
+
+.mypy_cache/
