@@ -100,6 +100,15 @@ def did_change(ls: server.LanguageServer, params: lsp.DidChangeTextDocumentParam
         ):
             update_doc_tree(ls, params.text_document.uri)
             update_doc_deps(ls, params.text_document.uri)
+            doc.current_bugs = []
+        else:
+            doc = ls.workspace.get_text_document(params.text_document.uri)
+            if hasattr(doc, 'current_bugs'):
+                # TODO: go through the existing content changes, and update their values by the range if tey are not equal
+                doc.current_bugs.append(params.content_changes)
+            else:
+                doc.current_bugs = [params.content_changes]
+
     except Exception as e:
         log_error(ls, f"Error during document change: {e}")
 
@@ -425,6 +434,18 @@ def semantic_tokens_full(ls, params: lsp.SemanticTokensParams) -> lsp.SemanticTo
                 continue
             data.append(sym.semantic_token)
         sorted_chunks = sort_chunks_relative_to_previous(data)
+        if hasattr(doc, 'current_bugs') and len(doc.current_bugs) > 0:
+            bugs = doc.current_bugs
+            new_lines = []
+            flat_bugs = []
+            for chunk in bugs:
+                flat_bugs.extend(chunk)
+            for i in flat_bugs:
+                new_lines.append(i.range.start.line)
+            unique_lines = list(set(new_lines))
+            # TODO: update the sorted chunks based on new line shifts
+            # TODO: manage horizontal shifts
+            # TODO: move these logics to a more generic way with Symbols --> can be used for hover and other infos
         sementic_tokens = flatten_chunks(sorted_chunks)
         return lsp.SemanticTokens(sementic_tokens)
     except Exception as e:
