@@ -105,9 +105,35 @@ def did_change(ls: server.LanguageServer, params: lsp.DidChangeTextDocumentParam
             doc = ls.workspace.get_text_document(params.text_document.uri)
             if hasattr(doc, 'current_bugs'):
                 # TODO: go through the existing content changes, and update their values by the range if tey are not equal
-                doc.current_bugs.append(params.content_changes)
+                any_bug_on_line = False
+                for change in params.content_changes:
+                    for bug in doc.current_bugs:
+                        if bug.range.start.line == change.range.start.line:
+                            any_bug_on_line = True
+                            break
+                if any_bug_on_line:
+                    # consider \n
+                    trimmed = params.content_changes[0].text.split('\n')
+                    if trimmed[0] == '':
+                        # increment start and end line of the bug
+                        for bug in doc.current_bugs:
+                            if bug.range.start.line > params.content_changes[0].range.start.line:
+                                bug.range.start.line += 1
+                                bug.range.end.line += 1
+                        doc.current_bugs.append(params.content_changes[0])
+                        doc.current_bugs[-1].range.start.line += 1
+                        doc.current_bugs[-1].range.end.line += 1
+             
+                    else:    
+                        doc.current_bugs.append(params.content_changes[0])
+                else:
+                    doc.current_bugs.append(params.content_changes[0])
+                    for bug in doc.current_bugs:
+                        if bug.range.start.line > params.content_changes.range.start.line:
+                            bug.range.start.line += 1
+                            bug.range.end.line += 1
             else:
-                doc.current_bugs = [params.content_changes]
+                doc.current_bugs = [params.content_changes[0]]
 
     except Exception as e:
         log_error(ls, f"Error during document change: {e}")
@@ -433,19 +459,24 @@ def semantic_tokens_full(ls, params: lsp.SemanticTokensParams) -> lsp.SemanticTo
             if sym.doc_uri != doc.uri:
                 continue
             data.append(sym.semantic_token)
-        sorted_chunks = sort_chunks_relative_to_previous(data)
+
         if hasattr(doc, 'current_bugs') and len(doc.current_bugs) > 0:
             bugs = doc.current_bugs
             new_lines = []
-            flat_bugs = []
-            for chunk in bugs:
-                flat_bugs.extend(chunk)
-            for i in flat_bugs:
-                new_lines.append(i.range.start.line)
+            for i in  bugs:
+                trimmed = i.text.split('\n')
+                if trimmed[0] == '':
+                    new_lines.append(i.range.start.line)
             unique_lines = list(set(new_lines))
             # TODO: update the sorted chunks based on new line shifts
             # TODO: manage horizontal shifts
             # TODO: move these logics to a more generic way with Symbols --> can be used for hover and other infos
+            # iteraty through the unique lines and for any line that is less than the line in the data, increment the line and start and end positions by one
+            for line in unique_lines:
+                for i, chunk in enumerate(data):
+                    if chunk[0] > line:
+                        data[i][0] += 1
+        sorted_chunks = sort_chunks_relative_to_previous(data)
         sementic_tokens = flatten_chunks(sorted_chunks)
         return lsp.SemanticTokens(sementic_tokens)
     except Exception as e:
