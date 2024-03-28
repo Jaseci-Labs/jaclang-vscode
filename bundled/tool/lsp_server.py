@@ -111,7 +111,13 @@ def did_change(ls: server.LanguageServer, params: lsp.DidChangeTextDocumentParam
                         if bug.range.start.line == change.range.start.line:
                             any_bug_on_line = True
                             break
-                if any_bug_on_line:
+                # for delete operation, decrement the start and end line of the bug
+                if params.content_changes[0].range.end.line > params.content_changes[0].range.start.line and params.content_changes[0].text == '':
+                    for bug in doc.current_bugs:
+                        if bug.range.start.line > params.content_changes[0].range.start.line:
+                            bug.range.start.line -= 1
+                            bug.range.end.line -= 1                
+                elif any_bug_on_line:
                     # consider \n
                     trimmed = params.content_changes[0].text.split('\n')
                     if trimmed[0] == '':
@@ -122,8 +128,8 @@ def did_change(ls: server.LanguageServer, params: lsp.DidChangeTextDocumentParam
                                 bug.range.end.line += 1
                         doc.current_bugs.append(params.content_changes[0])
                         doc.current_bugs[-1].range.start.line += 1
-                        doc.current_bugs[-1].range.end.line += 1
-             
+                        doc.current_bugs[-1].range.end.line += 1                 
+                       
                     else:    
                         doc.current_bugs.append(params.content_changes[0])
                 else:
